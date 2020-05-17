@@ -4,12 +4,12 @@ class Comunication
   attr_accessor :age
   
   def initialize(name:, age:)
-    self.name = name
-    self.age = age
+    @name = name
+    @age = age
   end
   
   def info
-    return "#{self.name}さん #{self.age}歳"
+    return "#{@name}さん #{@age}歳"
   end
 end  
 
@@ -63,7 +63,7 @@ class WorkPlaceComunication < Comunication
 
   def initialize(name:, age:, position:)
     super(name: name, age: age)
-    self.position = position
+    @position = position
   end
 
   def info
@@ -119,7 +119,7 @@ class FriendComunication < Comunication
 
   def initialize(name:, age:, from:)
     super(name: name, age: age)
-    self.from = from
+    @from = from
   end
 
   def info
