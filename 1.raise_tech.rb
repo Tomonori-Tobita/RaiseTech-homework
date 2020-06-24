@@ -1,5 +1,5 @@
 # コンソールに「HelloWorld」を表示してみよう。
-greeting = "HelloWorld"
+greeting = "Hello_World"
 puts greeting
 puts "------------------"
 
