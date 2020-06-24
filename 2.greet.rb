@@ -86,7 +86,7 @@ puts "誰に挨拶しますか？(番号を選択してください。)"
 
 def work(choice)
   if choice == 1
-    puts "先日はご馳走様でした。"
+    puts "先日はありがとうございました。"
   elsif choice == 2
     puts "お疲れ様です。" 
   else
