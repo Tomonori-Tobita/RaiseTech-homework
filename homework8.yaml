@@ -1,0 +1,303 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: HomeWork8
+
+Parameters: 
+  # MySQLのパラメーター------------------------------
+  HomeWork8MySQLMasterUser:
+    Type: String
+    Default: admin
+    MinLength: 1
+    MaxLength: 16
+    NoEcho: true
+
+  HomeWork8MySQLMasterPassword:
+    Type: String
+    Default: password
+    MinLength: 8
+    MaxLength: 16
+    NoEcho: true
+
+  # キーペアの指定------------------------------
+  KeyPair:
+    Description: Select KeyPair
+    Type: AWS::EC2::KeyPair::KeyName
+
+Resources:
+
+  # VPCの作成------------------------------
+  HomeWork8Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: HomeWork8Vpc
+
+  # インターネットゲートウェイ作成------------------------------
+  HomeWork8Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: HomeWork8Igw
+
+  HomeWork8AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref HomeWork8Vpc
+      InternetGatewayId: !Ref HomeWork8Igw
+
+  HomeWork8IgwRoute:
+    Type: AWS::EC2::Route
+    DependsOn: HomeWork8Igw
+    Properties:
+       RouteTableId: !Ref HomeWork8PublicRouteTable
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId: !Ref HomeWork8Igw
+
+  # サブネットの作成------------------------------
+  HomeWork8Public1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: ap-northeast-1a
+      VpcId: !Ref HomeWork8Vpc
+      MapPublicIpOnLaunch: true
+      CidrBlock: 10.0.0.0/24
+      Tags:
+        - Key: Name
+          Value: HomeWork8Public1a
+
+  HomeWork8Public1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: ap-northeast-1c
+      VpcId: !Ref HomeWork8Vpc
+      MapPublicIpOnLaunch: true
+      CidrBlock: 10.0.1.0/24
+      Tags:
+        - Key: Name
+          Value: HomeWork8Public1c 
+
+  HomeWork8Private1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: ap-northeast-1a
+      VpcId: !Ref HomeWork8Vpc
+      CidrBlock: 10.0.2.0/24
+      Tags:
+        - Key: Name
+          Value: HomeWork8Private1a
+
+  HomeWork8Private1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: ap-northeast-1c
+      VpcId: !Ref HomeWork8Vpc
+      CidrBlock: 10.0.3.0/24
+      Tags:
+        - Key: Name
+          Value: HomeWork8Private1c
+
+  # ルートテーブル作成------------------------------
+  HomeWork8PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref HomeWork8Vpc
+      Tags:
+        - Key: Name
+          Value: HomeWork8PublicRouteTable
+
+  HomeWork8PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref HomeWork8Vpc
+      Tags:
+        - Key: Name
+          Value: HomeWork8PrivateRouteTable
+
+  # サブネットとルートテーブルの関連付け----------------------------         
+  HomeWork8Public1aRouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref HomeWork8Public1a
+      RouteTableId: !Ref HomeWork8PublicRouteTable
+      
+  HomeWork8Public1cRouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref HomeWork8Public1c
+      RouteTableId: !Ref HomeWork8PublicRouteTable
+
+  HomeWork8Private1aRouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref HomeWork8Private1a
+      RouteTableId: !Ref HomeWork8PrivateRouteTable
+
+  HomeWork8Private1cRouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref HomeWork8Private1c
+      RouteTableId: !Ref HomeWork8PrivateRouteTable
+
+  # ロードバランサーの作成(ALB)------------------------------
+  HomeWork8SgForAlb:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref HomeWork8Vpc
+      GroupDescription: "http/s"
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: "80"
+        ToPort: "80"
+        CidrIp: 0.0.0.0/0
+
+      - IpProtocol: tcp
+        FromPort: "443"
+        ToPort: "443"
+        CidrIp: 0.0.0.0/0
+
+  HomeWork8Alb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref HomeWork8SgForAlb
+      Tags:
+        - Key: Name
+          Value: HomeWork8Alb
+      Subnets:
+        - !Ref HomeWork8Public1a
+        - !Ref HomeWork8Public1c
+
+  HomeWork8TargetGroupForAlb:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref HomeWork8Vpc
+      Protocol: HTTP
+      Port: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /
+      HealthCheckPort: 3000
+      HealthyThresholdCount: 5
+      UnhealthyThresholdCount: 2
+      HealthCheckTimeoutSeconds: 5
+      HealthCheckIntervalSeconds: 30
+      Matcher:
+        HttpCode: 200
+      TargetType: "ip" 
+      TargetGroupAttributes:
+                - Key: deregistration_delay.timeout_seconds
+                  Value: 300
+  
+  HomeWork8AlbListenerHTTP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            !Ref HomeWork8TargetGroupForAlb
+      LoadBalancerArn: 
+        !Ref HomeWork8Alb
+      Port: 80
+      Protocol: HTTP
+
+  # EC2インスタンス作成------------------------------
+  HomeWork8SgForPublic:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref HomeWork8Vpc
+      GroupName: HomeWork8SgForPublic
+      Tags:
+      - Key: Name
+        Value: HomeWork8SgForPublic
+      GroupDescription: Inbound
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: "22"
+        ToPort: "22"
+        CidrIp: 0.0.0.0/0
+
+      - IpProtocol: tcp
+        FromPort: "80"
+        ToPort: "80"
+        CidrIp: 0.0.0.0/0
+
+      - IpProtocol: tcp
+        FromPort: "443"
+        ToPort: "443"
+        CidrIp: 0.0.0.0/0
+
+      - IpProtocol: tcp
+        FromPort: "3000"
+        ToPort: "3000"
+        CidrIp: 0.0.0.0/0
+
+  HomeWork8EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: "ami-0a1c2ec61571737db" 
+      InstanceType: t2.micro
+      SubnetId: !Ref HomeWork8Public1a
+      SecurityGroupIds: 
+      - !Ref HomeWork8SgForPublic
+      Tags:
+        - Key: Name
+          Value: HomeWork8EC2Instance
+
+  # データベースの作成(MySQL)------------------------
+  HomeWork8DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: SubnetGroup
+      DBSubnetGroupName: HomeWork8DBSubnetGroup 
+      SubnetIds:
+      - !Ref HomeWork8Private1a
+      - !Ref HomeWork8Private1c
+
+  HomeWork8SgForPrivate:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref HomeWork8Vpc
+      GroupName: HomeWork8SgForPrivate
+      Tags:
+      - Key: Name
+        Value: HomeWork8SgForPrivate
+      GroupDescription: Inbound
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: "3306"
+        ToPort: "3306"
+        CidrIp: 0.0.0.0/0
+
+  HomeWork8DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceClass: db.t2.micro
+      AllocatedStorage: "5"
+      AvailabilityZone: ap-northeast-1a
+      DBParameterGroupName: default.mysql5.7
+      Engine: MySQL
+      EngineVersion: 5.7.28
+      MasterUsername: !Ref HomeWork8MySQLMasterUser
+      MasterUserPassword: !Ref HomeWork8MySQLMasterPassword 
+      Port: 3306
+      DBSubnetGroupName: !Ref HomeWork8DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref HomeWork8SgForPrivate
+ 
+
+  
+
+  
+
+  
+
+  
+
+      
+
+  
